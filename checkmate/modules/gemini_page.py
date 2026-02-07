@@ -253,7 +253,11 @@ def analyze_page_with_gemini(
     - Retry once if invalid JSON, then fail-soft
     """
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
+<<<<<<< HEAD
     model = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
+=======
+    model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+>>>>>>> a9ad2796c12870772d00461b6ccb59e0373c0685
     if not api_key:
         return _fallback_result(page_url, "Missing GEMINI_API_KEY")
 
@@ -294,5 +298,11 @@ def analyze_page_with_gemini(
         return result
 
     except Exception as e:
+<<<<<<< HEAD
         print(f"DEBUG: Gemini Error: {e}")
         return _fallback_result(page_url, f"Exception: {type(e).__name__}: {str(e)}")
+=======
+        return _fallback_result(page_url, f"Exception: {type(e).__name__}")
+
+pass
+>>>>>>> a9ad2796c12870772d00461b6ccb59e0373c0685
