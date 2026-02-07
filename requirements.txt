@@ -12,4 +12,5 @@ python-whois
 pyOpenSSL
 rapidfuzz
 pytest
+responses
 google-genai
