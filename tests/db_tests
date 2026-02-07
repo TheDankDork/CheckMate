@@ -1,0 +1,52 @@
+import ssl
+from unittest.mock import patch
+
+from checkmate.modules.domain_info import get_domain_info
+from checkmate.modules.security_check import check_security
+from checkmate.modules.threat_intel import ThreatIntelCache, match_url, parse_urlhaus_csv
+
+
+def test_parse_urlhaus_csv_fixture():
+    sample_csv = "\n".join(
+        [
+            "# comment line",
+            '"id","dateadded","url","url_status","threat","tags","urlhaus_link","reporter"',
+            '"123","2024-01-01","http://malicious.example.com/path","online","malware","","",""',
+        ]
+    )
+    url_set, domain_set = parse_urlhaus_csv(sample_csv)
+    assert "http://malicious.example.com/path" in url_set
+    assert "example.com" in domain_set
+
+
+def test_match_url_hits_url_and_domain():
+    cache = ThreatIntelCache(
+        url_set={"http://bad.example.com/login"},
+        domain_set={"example.com"},
+        last_updated="2024-01-01T00:00:00Z",
+    )
+    result = match_url("http://bad.example.com/login", cache=cache)
+    assert result["url_match"] is True
+    assert result["domain_match"] is True
+    assert any(hit["risk"] == "HIGH" for hit in result["provider_hits"])
+    assert any(hit["risk"] == "MED" for hit in result["provider_hits"])
+
+
+def test_domain_info_whois_failure():
+    with patch("checkmate.modules.domain_info.whois.whois", side_effect=Exception("whois down")):
+        result = get_domain_info("https://example.com")
+    assert result["registered_domain"] == "example.com"
+    assert result["creation_date"] is None
+    assert result["registrar"] is None
+    assert "whois down" in result["whois_error"]
+
+
+def test_security_check_ssl_failure():
+    with patch(
+        "checkmate.modules.security_check._get_certificate_info",
+        side_effect=ssl.SSLError("bad cert"),
+    ):
+        result = check_security("https://example.com")
+    assert result["uses_https"] is True
+    assert result["cert_valid"] is False
+    assert "bad cert" in result["error"]
