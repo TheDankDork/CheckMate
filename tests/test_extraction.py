@@ -7,7 +7,7 @@ HTML_LEGIT = """
 <body>
     <nav>Menu</nav>
     <h1>Welcome to Legit Corp</h1>
-    <p>Contact us at support@legit.com or call +1-555-0100.</p>
+    <p>Contact us at support@legit.com or call +1-650-253-0000.</p>
     <p>We value your privacy.</p>
     <a href="/about">About Us</a>
     <a href="https://google.com">Search</a>
@@ -34,7 +34,7 @@ def test_extract_legit():
     assert features["title"] == "Legit Corp"
     assert "Welcome to Legit Corp" in features["headings"]
     assert "support@legit.com" in features["emails"]
-    assert "+15550100" in features["phones"]
+    assert "+16502530000" in features["phones"]
     assert "https://legit.com/about" in features["links_internal"]
     assert "https://google.com" in features["links_external"]
     assert "Menu" not in features["clean_text"] # nav removed
