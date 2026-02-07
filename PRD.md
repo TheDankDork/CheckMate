@@ -3,9 +3,7 @@
 ## Product intent and delivery targets
 CheckMate takes a single website URL and returns a legitimacy assessment where 100 = more legitimate and 0 = more risky, with explainable evidence suitable for a hackathon demo. The backend should return JSON first, with an optional HTML report if there’s time.
 
-Your timeboxes (as stated) drive scope decisions: an end-to-end backend pipeline by Feb 7, 2026 8:00 PM (America/Toronto), with a demo by Feb 8, 2026 9:00 AM.
-
-The design principle for this PRD is: **Gemini is the core analysis engine.** The backend exists mainly to (a) fetch safely, (b) package content, (c) call Gemini using structured output, (d) validate evidence, (e) run deterministic checks Gemini cannot do, and (f) compute final numeric scores deterministically from Gemini-produced signals. Gemini structured outputs support generating responses that adhere to a provided JSON Schema, using `response_mime_type: application/json` and a schema definition.
+The project funtions primarily with **Gemini as the core analysis engine.** The backend exists mainly to (a) fetch safely, (b) package content, (c) call Gemini using structured output, (d) validate evidence, (e) run deterministic checks Gemini cannot do, and (f) compute final numeric scores deterministically from Gemini-produced signals. Gemini structured outputs support generating responses that adhere to a provided JSON Schema, using `response_mime_type: application/json` and a schema definition.
 
 ## System architecture and data contract
 The architecture is a single synchronous API request that drives a bounded crawl, then a small number of Gemini calls (page-level only), then deterministic safety/reputation checks, then a scoring and reporting step.
@@ -19,7 +17,7 @@ Recommended top-level response fields (minimum viable, not exhaustive):
 
 *   `status`: "ok" | "na" | "error"
 *   `overall_score`: integer 0–100 or null
-*   `subscores`: { formatting, relevance, sources, risk } as integers 0–100
+*   `subscores`: { formatting, relevance, sources, ri   sk } as integers 0–100
 *   `risks`: array of { severity, code, title, evidence[] }
 *   `missing_pages`: array of strings (contact/about/privacy/terms)
 *   `pages_analyzed`: array of { url, status_code, title, extracted_date? }
@@ -34,7 +32,6 @@ This PRD assumes “JSON-first,” which aligns with the Gemini docs guidance th
 ## Gemini as the core analysis engine
 
 ### Page-level call pattern
-You decided:
 *   Up to 5 Gemini calls per `/analyze`
 *   Each call receives cleaned text (not raw HTML) capped at 12,000 characters per page
 *   Calls are page-level only (no “final merge call”)
@@ -43,15 +40,14 @@ You decided:
 Structured outputs with JSON Schema are explicitly supported by the Gemini API and SDKs; using schema constraints is the most reliable way to prevent “format drift” and integration problems.
 
 ### Evidence, validation, and prompt-injection defenses
-Because you are placing untrusted webpage content into an LLM context, prompt injection defenses are not optional.
 Describes prompt injection as a vulnerability where malicious input manipulates model behavior, and recommends treating external content as untrusted, using clear boundaries/delimiters, and other defenses.
 
-Your additional guardrail (already decided) is **strict evidence validation**: every Gemini `evidence_snippet` must be an exact substring of the cleaned text you sent. If not found, downgrade the risk item to UNCERTAIN and record a limitation (e.g., evidence_unverified). This prevents the demo from relying on evidence that wasn’t actually present on the page.
+There should be an additional guardrail of **strict evidence validation**: every Gemini `evidence_snippet` must be an exact substring of the cleaned text you sent. If not found, downgrade the risk item to UNCERTAIN and record a limitation (e.g., evidence_unverified). This prevents the demo from relying on evidence that wasn’t actually present on the page.
 
 ### Optional claim verification via Google Search grounding
 If enabled, Gemini’s `google_search` tool can automatically search the web, synthesize results, and return `groundingMetadata` containing search queries, sources, and citation mappings (`groundingSupports`/`groundingChunks`).
 
-Because you may not be sure whether grounding is available in your account, implement it as “optional if enabled,” not as a hard dependency:
+## Usage of grounding
 1.  If grounding is enabled, do one site-level verification call that returns citations (with `groundingMetadata`).
 2.  If grounding is unavailable, fall back to your tool list (Fact Check Tools API and/or a standard search API), then send those snippets into Gemini for a structured judgment.
 
@@ -59,10 +55,7 @@ Grounding also has usage implications: the response can include `searchEntryPoin
 
 Grounding can also have separate pricing/quotas; the official pricing page describes billing/limits for “Grounding with Google Search.”
 
-This is why the PRD makes grounding optional and fail-soft.
-
 ## Tooling plan: use Gemini first, but keep deterministic fallbacks
-You asked to “use these tools if possible if Gemini cannot replace its job.” The division below keeps Gemini central, but does not force Gemini to do tasks it cannot do (e.g., TLS certificate verification) or tasks where determinism is a demo advantage.
 
 ### Extraction and page packaging
 *   Use **Beautiful Soup** for HTML parsing and text extraction. It’s designed to parse HTML (even imperfect markup) into a tree and extract content; this is the cleanest way to generate consistent `clean_text` inputs for Gemini.
@@ -78,9 +71,9 @@ You asked to “use these tools if possible if Gemini cannot replace its job.”
 *   If Gemini fails or outputs low-confidence results, fallback to TF-IDF similarity using **TfidfVectorizer** (title/headings vs body). `TfidfVectorizer` produces TF-IDF feature matrices; it’s a standard approach for lightweight similarity signals.
 
 ### Entity extraction and chunk selection
-*   If you need deterministic chunk selection (for example, to choose the “most informative” 12,000 characters), you can optionally use **spaCy NER** and **textacy** helpers. spaCy’s entity recognizer identifies labeled spans (entities). textacy is built “before and after spaCy” and supports extracting structured info such as entities and keyterms.
+*   If deterministic chunk selection (for example, to choose the “most informative” 12,000 characters) is needed, use **spaCy NER** and **textacy** helpers. spaCy’s entity recognizer identifies labeled spans (entities). textacy is built “before and after spaCy” and supports extracting structured info such as entities and keyterms.
 
-This is optional; Gemini alone can do most extraction, but spaCy/textacy can make your truncation less random.
+This is optional; Gemini alone can do most extraction, but spaCy/textacy can make truncation less random.
 
 ### Fact checking and “controversy” checks
 If available, the **Fact Check Tools API** provides `claims.search` endpoints to query fact-checked claims (requires API key).
@@ -96,18 +89,15 @@ Implement deterministic URL/domain matching using:
 *   **PhishTank** API for phishing lookups (POST-based lookups described in their API info).
 *   **OpenPhish** community feed as another deterministic signal source (optional, depending on terms and availability).
 
-You already selected: **local cache + background refresh every 6 hours**. For hackathon stability, treat your last-known-good cache as authoritative if refresh fails.
+For stability, treat your last-known-good cache as authoritative if refresh fails.
 
 You also already selected:
 *   exact URL match = HIGH severity and will trigger a hard score cap
 *   domain-only match = MED severity
 
 ### Safety and encryption checks
-*   For TLS certificate logic, use Python SSL/requests exceptions for MVP, and optionally use **pyOpenSSL** if you want issuer/expiry details. The pyOpenSSL SSL module exposes OpenSSL Context/Connection primitives and verification configuration options.
-*   Because `requests` does not time out by default and provides explicit timeout semantics, you must set `timeout=10` everywhere you fetch pages or check links.
-
-### Google Safe Browsing API v4
-You explicitly decided to skip Safe Browsing for MVP. If you consider it later, note that the Safe Browsing APIs are for non-commercial use, and Google recommends Web Risk for commercial usage.
+*   For TLS certificate logic, use Python SSL/requests exceptions for MVP, and optionally use **pyOpenSSL** for issuer/expiry details. The pyOpenSSL SSL module exposes OpenSSL Context/Connection primitives and verification configuration options.
+*   Because `requests` does not time out by default and provides explicit timeout semantics, set `timeout=10` everywhere the code fetches pages or checks links.
 
 ## Scoring and explainability rules
 
@@ -122,7 +112,7 @@ Recommended subscores from Gemini’s normalized signals (convert 0–1 to 0–1
 *   **Sources:** `source_traceability_0_1` plus penalties for “claims without citations”
 *   **Risk:** start at 100 and subtract penalty points based on structured risk items + deterministic checks
 
-Use the weight choice you already researched earlier (risk-heavy) unless you change it later:
+Weight choice:
 *   Risk 40%
 *   Sources 35%
 *   Formatting 15%
