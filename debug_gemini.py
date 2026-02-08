@@ -12,12 +12,10 @@ def test_gemini_module():
     print("Testing Member 2 (Gemini Module)")
     print(f"{'='*60}")
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
-        # Fallback if not set in shell (for testing in this session)
-        # Note: In a real app, use .env
-        print("Warning: GEMINI_API_KEY not found in env. Trying to use provided key...")
-        os.environ["GEMINI_API_KEY"] = "AIzaSyCYBU96meiAEBAFamvjIVR8pc-KrK57Quk"
+        print("Set GEMINI_API_KEY in .env (see .env.example)")
+        sys.exit(1)
 
     # Mock Data (simulating what Extraction module would provide)
     page_url = "https://example.com/fake-scam"

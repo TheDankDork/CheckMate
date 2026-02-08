@@ -1,7 +1,12 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from google import genai
 
-api_key = "AIzaSyCmV7O6nCvvQ1-7joHoHjZLeNKaAMJv8jc"
+api_key = os.getenv("GEMINI_API_KEY", "").strip()
+if not api_key:
+    print("Set GEMINI_API_KEY in .env (see .env.example)")
+    exit(1)
 client = genai.Client(api_key=api_key)
 
 print("Listing models...")
