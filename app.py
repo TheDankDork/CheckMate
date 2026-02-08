@@ -2,14 +2,13 @@
 from __future__ import annotations
 
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from checkmate.pipeline import run_pipeline
 from checkmate.scoring import compute_score
 from checkmate.render import render_output
 from checkmate.schemas import AnalyzeRequest
 
 app = Flask(__name__)
-
 
 ALLOWED_ORIGINS = {
     "http://localhost:5173",
@@ -30,6 +29,11 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     return response
+
+
+@app.route("/", methods=["GET"])
+def home():
+    return send_from_directory(".", "index.html")
 
 
 @app.route("/analyze", methods=["POST", "OPTIONS"])
