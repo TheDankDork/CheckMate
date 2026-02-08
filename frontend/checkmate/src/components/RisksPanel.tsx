@@ -1,7 +1,7 @@
 import type { RiskItem, RiskSeverity, EvidenceItem } from "../api/types";
 
 export interface RisksPanelProps {
-  risks: RiskItem[] | null | undefined;
+  risks?: RiskItem[] | null;
 }
 
 const SEVERITY_ORDER: RiskSeverity[] = ["HIGH", "MED", "LOW", "UNCERTAIN"];
@@ -58,12 +58,13 @@ function RiskCard({ risk }: { risk: RiskItem }) {
   );
 }
 
-export function RisksPanel({ risks }: RisksPanelProps) {
+export function RisksPanel({ risks = [] }: RisksPanelProps) {
+  const safeRisks = risks ?? [];
   const bySeverity =
-    risks.length > 0
-      ? SEVERITY_ORDER.map((sev) => ({
+    safeRisks.length > 0
+    ? SEVERITY_ORDER.map((sev) => ({
           severity: sev,
-          items: risks.filter((r) => r.severity === sev),
+          items: safeRisks.filter((r) => r.severity === sev),
         })).filter((g) => g.items.length > 0)
       : [];
 
