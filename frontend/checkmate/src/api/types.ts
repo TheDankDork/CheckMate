@@ -37,6 +37,16 @@ export interface Subscores {
 
 export type WebsiteType = "functional" | "statistical" | "news_historical" | "company";
 
+export interface ScoringDebugInfo {
+  website_type?: WebsiteType;
+  weights?: Record<string, number>;
+}
+
+export interface DebugInfo {
+  website_type?: WebsiteType;
+  scoring?: ScoringDebugInfo;
+}
+
 export interface AnalyzeResponse {
   status: AnalyzeStatus;
   overall_score: number | null;
@@ -50,5 +60,5 @@ export interface AnalyzeResponse {
   domain_info?: Record<string, unknown>;
   security_info?: Record<string, unknown>;
   threat_intel?: Record<string, unknown>;
-  debug?: Record<string, unknown>;
+  debug?: DebugInfo;
 }
