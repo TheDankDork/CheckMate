@@ -11,6 +11,8 @@ git clone https://github.com/TheDankDork/CheckMate.git
 cd CheckMate
 ```
 
+**Important:** You must be in the **repo root** — the folder that contains `app.py`, `requirements.txt`, and `.env.example`. If you don’t see those files, run `cd ..` and try again.
+
 (If the repo is still named CXC, use `CXC` instead of `CheckMate` in the URL and folder name.)
 
 ---
@@ -58,6 +60,9 @@ Enter a URL and click **Analyze**.
 
 ## If something breaks
 
+- **"Request failed (500)"** or **Vite "proxy error /analyze" / ECONNREFUSED** → The **backend is not running**. Open a second terminal, go to the project root, run `python app.py`, and leave it open. You need both the frontend (npm run dev) and the backend (python app.py) running.
+- **"Request failed (500)"** (backend *is* running) → The backend crashed. Look at the **backend terminal** — the error is printed there. Common causes: missing `.env` or `GEMINI_API_KEY`, or a missing Python package.
+- **"npm is not recognized"** → Install [Node.js](https://nodejs.org) (LTS), then **close and reopen the terminal**. The frontend needs Node and npm.
 - **"Failed to fetch"** → Start the backend (step 2).
 - **Analysis fails / "Missing GEMINI_API_KEY"** → Create `.env`, add your key, restart the backend.
 - **Port in use** → Stop whatever is using port 5000 or 5173, or use another port (e.g. `PORT=5001 python app.py`).

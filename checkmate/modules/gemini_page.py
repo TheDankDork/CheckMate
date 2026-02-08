@@ -435,11 +435,16 @@ def analyze_page_with_gemini(
     except Exception as e:
         logger.exception("Gemini API call failed: %s", e)
         reason = str(e)
-        # User-friendly message for quota/rate limit (429)
+        # User-friendly messages for common errors
         if "429" in reason or "RESOURCE_EXHAUSTED" in reason or "quota" in reason.lower():
             reason = (
                 "Gemini API quota exceeded for this key. "
                 "Try again in a few minutes or create a new API key at aistudio.google.com/apikey."
+            )
+        elif "400" in reason or "INVALID_ARGUMENT" in reason or "API key not valid" in reason or "invalid" in reason.lower() and "key" in reason.lower():
+            reason = (
+                "Invalid Gemini API key. Put a valid key in .env (GEMINI_API_KEY) and restart the backend. "
+                "Get a key at aistudio.google.com/apikey."
             )
         else:
             reason = f"Exception: {type(e).__name__}: {reason}"

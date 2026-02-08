@@ -3,7 +3,14 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
+
+# Load .env from project root (where app.py lives) so the key is found no matter where you run from
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 from flask import Flask, request, jsonify, send_from_directory
+from pydantic import ValidationError
 from checkmate.pipeline import run_pipeline
 from checkmate.scoring import compute_score
 from checkmate.render import render_output
@@ -53,6 +60,8 @@ def analyze():
         return "", 204
     try:
         data = request.get_json()
+        if data is None:
+            return jsonify({"status": "error", "error": "Request body must be JSON with a 'url' field."}), 400
         parsed = AnalyzeRequest(**data)
         result = run_pipeline(parsed.url)
 
@@ -62,12 +71,17 @@ def analyze():
         rendered = render_output(result)
         return jsonify(rendered)
 
+    except ValidationError:
+        return jsonify({"status": "error", "error": "Invalid request: send JSON with a 'url' field."}), 400
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+        logger.exception("Analyze failed: %s", e)
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not key:
+        logger.warning("GEMINI_API_KEY is not set. Create .env from .env.example and add your key.")
+    else:
+        logger.info("GEMINI_API_KEY is set (len=%d).", len(key))
     app.run(host="0.0.0.0", port=port)
