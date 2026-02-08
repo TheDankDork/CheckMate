@@ -69,6 +69,7 @@ def analyze():
             result = compute_score(result)
 
         rendered = render_output(result)
+        logger.info("Analyze done url=%s -> website_type=%s", parsed.url, rendered.get("website_type"))
         return jsonify(rendered)
 
     except ValidationError:
