@@ -49,6 +49,12 @@ COMPANY_SIGNAL_PATTERN = re.compile(
     re.I,
 )
 
+NEWS_SIGNAL_PATTERN = re.compile(
+    r"\b(breaking\s+news|latest\s+news|headline|reported|reporting|journalist|"
+    r"newsroom|news\s+alert|top\s+stories|local\s+news|world\s+news|"
+    r"politics|sports|weather|traffic)\b",
+    re.I,
+)
 
 def _domain_from_url(url: str) -> str:
     try:
@@ -99,6 +105,13 @@ def _looks_like_company_site(page_url: str, page_title: Optional[str], text_snip
     combined = " ".join(filter(None, [page_title or "", (text_snippet or "")[:2500]]))
     return bool(COMPANY_SIGNAL_PATTERN.search(combined))
 
+def _looks_like_news_site(page_url: str, page_title: Optional[str], text_snippet: str) -> bool:
+    """True if domain or content clearly indicates a news/encyclopedia/educational site."""
+    domain = _domain_from_url(page_url)
+    if domain and _domain_looks_like_news_or_encyclopedia(domain):
+        return True
+    combined = " ".join(filter(None, [page_title or "", (text_snippet or "")[:2500]]))
+    return bool(NEWS_SIGNAL_PATTERN.search(combined))
 
 def _website_type_schema() -> Dict[str, Any]:
     """Schema for website-type classification only."""
@@ -120,6 +133,8 @@ def _resolve_website_type(
     raw_type: str, page_url: str, page_title: Optional[str], text_snippet: str
 ) -> str:
     """Apply fallback: if result is news_historical but site looks like company, return company."""
+    if raw_type == "company" and _looks_like_news_site(page_url, page_title, text_snippet):
+        return "news_historical"
     if raw_type != "news_historical":
         return raw_type
     if _looks_like_company_site(page_url, page_title, text_snippet):
