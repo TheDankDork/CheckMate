@@ -10,7 +10,7 @@ import type { AnalyzeResponse } from "./types";
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   (import.meta.env.DEV ? "/api" : "http://localhost:5000");
-const REQUEST_TIMEOUT_MS = 35000;
+const REQUEST_TIMEOUT_MS = 90000;
 
 export async function postAnalyze(url: string): Promise<AnalyzeResponse> {
   const controller = new AbortController();
@@ -44,7 +44,7 @@ export async function postAnalyze(url: string): Promise<AnalyzeResponse> {
     clearTimeout(timeoutId);
     if (err instanceof Error) {
       if (err.name === "AbortError")
-        throw new Error("Request timed out. The analysis can take up to 30 seconds—please try again.");
+        throw new Error("Request timed out. The analysis can take up to 90 seconds—please try again.");
       throw err;
     }
     throw new Error("Network or server error. Try again or analyze another URL.");
