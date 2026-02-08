@@ -84,6 +84,9 @@ def _score_risk(result: AnalysisResult, debug: Dict[str, Any]) -> int:
 
     score = 100
     deductions = []
+    print("ALL RISKS TYPE:", type(result.risks))
+    if result.risks:
+        print("FIRST RISK TYPE:", type(result.risks[0]))
     for risk in result.risks:
         if risk.severity == "HIGH":
             score -= 30
