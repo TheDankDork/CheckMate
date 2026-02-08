@@ -35,7 +35,7 @@ def _website_type_schema() -> Dict[str, Any]:
             "website_type": {
                 "type": "string",
                 "enum": WEBSITE_TYPE_VALUES,
-                "description": "functional=utility sites (e.g. Amazon, LinkedIn, games); statistical=data-focused; news_historical=news/facts; company=company/corporate sites",
+                "description": "functional=utility; statistical=data-focused; news_historical=third-party news/encyclopedias/educational only; company=any business/corporate/brand site (prefer company when site represents one organization)",
             },
         },
         "required": ["website_type"],
@@ -61,8 +61,9 @@ def classify_website_type_with_gemini(page_url: str, page_title: Optional[str], 
         "Types:\n"
         "- functional: Sites that provide utility (e.g. Amazon, LinkedIn, gaming, tools, apps, marketplaces). Focus is on function, not citing sources.\n"
         "- statistical: Sites that present data, statistics, datasets, or numerical reports. Recency of data matters.\n"
-        "- news_historical: News outlets, encyclopedias, historical or educational information. Standard editorial standards.\n"
-        "- company: Corporate or company websites (about us, products, services, careers). Brand and presentation matter more than external sources.\n\n"
+        "- news_historical: Third-party news outlets, encyclopedias (e.g. Wikipedia), or dedicated educational/historical content sites. NOT company-owned pages: a company's own 'news' or 'our story' pages are company sites.\n"
+        "- company: Any corporate or business website: about us, products, services, careers, brand, investor relations, press releases. If the site primarily represents one organization or brand, choose company—even if it has a news section or company history.\n\n"
+        "Rule: When the site is clearly for a single business, brand, or organization (e.g. acme.com, bigcorp.com), use company. Use news_historical only for independent news/media, encyclopedias, or educational/historical resources.\n\n"
         f"URL: {page_url}\n"
         f"Title: {page_title or '(none)'}\n"
         f"Text snippet:\n{snippet}\n"
