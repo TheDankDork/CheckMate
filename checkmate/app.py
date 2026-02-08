@@ -1,33 +1,34 @@
+# Updated app.py for CheckMate to match full pipeline and schema integration
+from __future__ import annotations
+
+import os
 from flask import Flask, request, jsonify
-from .schemas import AnalyzeRequest, AnalysisResult
-from .pipeline import analyze_url
-import logging
+from checkmate.pipeline import run_pipeline
+from checkmate.scoring import compute_scores
+from checkmate.render import render_result
+from checkmate.schemas import AnalyzeRequest
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
 
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"ok": True})
-
-@app.route('/analyze', methods=['POST'])
+@app.route("/analyze", methods=["POST"])
 def analyze():
     try:
         data = request.get_json()
-        req = AnalyzeRequest(**data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        parsed = AnalyzeRequest(**data)
+        result = run_pipeline(parsed.url)
 
-    try:
-        result = analyze_url(req.url)
-        # If optional HTML format is requested, we would handle it here
-        # format = request.args.get('format')
-        # if format == 'html': return render_html(result)
-        
-        return jsonify(result.model_dump())
-    except Exception as e:
-        logging.error(f"Analysis failed: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": str(e)}), 500
+        if result.status == "ok":
+            result = compute_scores(result)
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+        rendered = render_result(result)
+        return jsonify(rendered)
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
