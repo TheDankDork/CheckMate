@@ -19,11 +19,11 @@ export function ScoreHero({ overallScore, status }: ScoreHeroProps) {
     <div
       className={`rounded-2xl border border-slate-200/90 bg-gradient-to-br ${styles.bg} p-10 text-center shadow-lg overflow-hidden relative`}
       role="region"
-      aria-label="Overall legitimacy score"
+      aria-label="Overall score"
     >
       <div className={`absolute top-0 left-0 right-0 h-1 ${styles.bar}`} aria-hidden />
       <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-        Overall legitimacy score
+        Overall score
       </p>
       <div className="mt-4">
         {showNumeric ? (

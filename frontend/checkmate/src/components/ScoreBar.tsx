@@ -29,7 +29,7 @@ export function ScoreBar({ score }: ScoreBarProps) {
       }
     >
       <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
-        Score by risk level
+        Score
       </p>
       {/* Bar with overlay marker */}
       <div className="relative w-full">
