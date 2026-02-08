@@ -75,13 +75,17 @@ def run_pipeline(url: str) -> AnalysisResult:
     )
 
     result.debug["gemini"] = gemini_result
-    result.limitations.extend(gemini_result.get("limitations", []))
+    for lim in gemini_result.get("limitations", []):
+        if lim and "Gemini page analysis failed" in lim:
+            lim = "Page analysis could not be completed (API error). Check server log for details."
+        result.limitations.append(lim)
 
-    # Attach Gemini page type and risks (skip legacy fallback "Gemini page analysis failed" risk)
-    gemini_risks = [
-        r for r in gemini_result.get("risks", [])
-        if (r.get("code") != "GEMINI_FAILED" and (r.get("title") or "").strip() != "Gemini page analysis failed")
-    ]
+    # Attach Gemini page type and risks (skip any Gemini-failure risk so it never appears in Risks & warnings)
+    def _is_gemini_failure_risk(r: dict) -> bool:
+        title = (r.get("title") or "").lower()
+        code = (r.get("code") or "").upper()
+        return "gemini page analysis failed" in title or code == "GEMINI_FAILED"
+    gemini_risks = [r for r in gemini_result.get("risks", []) if not _is_gemini_failure_risk(r)]
     result.risks.extend([
         RiskItem(
             severity=r["severity"],

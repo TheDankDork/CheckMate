@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 load_dotenv()
@@ -12,8 +13,14 @@ load_dotenv()
 #
 # If your repo uses "google-generativeai" instead, tell me and I'll adapt imports/calls.
 from google import genai  # type: ignore
+from google.genai import errors as genai_errors  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+# On 429, wait this many seconds then retry once; then try alternate model
+GEMINI_429_RETRY_DELAY = 45
+# Alternate model to try on 429 (different quota bucket; e.g. gemini-2.0-flash-lite)
+GEMINI_429_ALTERNATE_MODEL = "gemini-2.0-flash-lite"
 
 
 # Website type for score weighting (classify before full analysis)
@@ -199,6 +206,12 @@ def _build_prompt(
 
 def _fallback_result(page_url: str, reason: str) -> Dict[str, Any]:
     """Return a safe default when Gemini fails. No risk card—add reason to limitations only."""
+    # Never show "Gemini page analysis failed" in the UI; use a short user-facing message
+    if "Gemini page analysis failed" in (reason or ""):
+        reason = "API error (check server log for details)."
+    if len(reason or "") > 200:
+        reason = (reason[:197] + "...") if reason else "API error."
+    limitation_msg = f"Page analysis could not be completed: {reason}" if reason else "Page analysis could not be completed."
     return {
         "page_url": page_url,
         "page_type": "unknown",
@@ -214,7 +227,7 @@ def _fallback_result(page_url: str, reason: str) -> Dict[str, Any]:
         },
         "numeric_claims": [],
         "risks": [],
-        "limitations": [f"Page analysis could not be completed: {reason}"],
+        "limitations": [limitation_msg],
     }
 
 
@@ -353,9 +366,26 @@ def analyze_page_with_gemini(
         link_stats=link_stats,
     )
 
-    # Call Gemini and parse JSON (retry once)
+    # Call Gemini and parse JSON (retry once on invalid JSON; on 429: wait+retry, then try alternate model)
     try:
-        raw = _call_gemini_json(prompt, schema, api_key, model)
+        raw = None
+        try:
+            raw = _call_gemini_json(prompt, schema, api_key, model)
+        except genai_errors.ClientError as e:
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                logger.warning("Gemini 429 on %s — waiting %ss then retrying once", model, GEMINI_429_RETRY_DELAY)
+                time.sleep(GEMINI_429_RETRY_DELAY)
+                try:
+                    raw = _call_gemini_json(prompt, schema, api_key, model)
+                except genai_errors.ClientError as e2:
+                    if "429" in str(e2) and model != GEMINI_429_ALTERNATE_MODEL:
+                        logger.warning("Still 429 — trying alternate model %s", GEMINI_429_ALTERNATE_MODEL)
+                        raw = _call_gemini_json(prompt, schema, api_key, GEMINI_429_ALTERNATE_MODEL)
+                    else:
+                        raise
+            else:
+                raise
         if not raw:
             return _fallback_result(page_url, "Empty Gemini response text")
 
@@ -403,13 +433,13 @@ def analyze_page_with_gemini(
         return result
 
     except Exception as e:
-        logger.exception("Gemini page analysis failed: %s", e)
+        logger.exception("Gemini API call failed: %s", e)
         reason = str(e)
         # User-friendly message for quota/rate limit (429)
         if "429" in reason or "RESOURCE_EXHAUSTED" in reason or "quota" in reason.lower():
             reason = (
-                "Gemini API rate limit exceeded (free tier is 20 requests/day per model). "
-                "Try again later or set GEMINI_MODEL=gemini-1.5-flash in .env for a separate quota."
+                "Gemini API quota exceeded for this key. "
+                "Try again in a few minutes or create a new API key at aistudio.google.com/apikey."
             )
         else:
             reason = f"Exception: {type(e).__name__}: {reason}"

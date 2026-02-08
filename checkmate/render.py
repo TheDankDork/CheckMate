@@ -32,6 +32,8 @@ def render_output(result: AnalysisResult) -> Dict[str, Any]:
                 ],
             }
             for r in result.risks
+            if "gemini page analysis failed" not in (r.title or "").lower()
+            and (r.code or "").upper() != "GEMINI_FAILED"
         ],
         "missing_pages": result.missing_pages,
         "pages_analyzed": [
@@ -46,7 +48,10 @@ def render_output(result: AnalysisResult) -> Dict[str, Any]:
         "domain_info": result.domain_info,
         "security_info": result.security_info,
         "threat_intel": result.threat_intel,
-        "limitations": result.limitations,
+        "limitations": [
+            "Page analysis could not be completed (API error)." if (lim and "Gemini page analysis failed" in lim) else lim
+            for lim in (result.limitations or [])
+        ],
         "debug": result.debug,
     }
     return output
