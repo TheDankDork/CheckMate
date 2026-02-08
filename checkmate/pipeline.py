@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import List
 from urllib.parse import urlparse
 
@@ -51,9 +52,10 @@ def run_pipeline(url: str) -> AnalysisResult:
         page_features.get("headings", [])
     )
 
-    # Classify website type first (for score weighting)
-    # Short-circuit: if URL domain clearly indicates company (e.g. janestreet.com), set company and skip Gemini
-    website_type = website_type_from_domain(url)
+    # Prefer Gemini classification when configured; use domain heuristic only as a fallback.
+    website_type = None
+    if not os.getenv("GEMINI_API_KEY", "").strip():
+        website_type = website_type_from_domain(url)
     if website_type is not None:
         logger.info("website_type=%s (from domain for %s)", website_type, url)
     if website_type is None:
