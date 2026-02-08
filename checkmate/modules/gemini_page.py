@@ -84,7 +84,9 @@ def website_type_from_domain(url: str) -> Optional[str]:
         return None
     if _domain_looks_like_news_or_encyclopedia(domain):
         return None
-    return "company"
+    if re.search(r"\b(inc|corp|llc|ltd|holdings?|group|co|company)\b", domain):
+        return "company"
+    return None
 
 
 def _looks_like_company_site(page_url: str, page_title: Optional[str], text_snippet: str) -> bool:
@@ -120,11 +122,6 @@ def _resolve_website_type(
     """Apply fallback: if result is news_historical but site looks like company, return company."""
     if raw_type != "news_historical":
         return raw_type
-    domain = _domain_from_url(page_url)
-    # If domain is clearly not news/encyclopedia (e.g. janestreet.com, stripe.com), treat as company
-    if domain and not _domain_looks_like_news_or_encyclopedia(domain):
-        return "company"
-    # Else check content signals (e.g. careers, about us)
     if _looks_like_company_site(page_url, page_title, text_snippet):
         return "company"
     return "news_historical"
