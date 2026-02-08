@@ -60,7 +60,7 @@ function RiskCard({ risk }: { risk: RiskItem }) {
 
 export function RisksPanel({ risks }: RisksPanelProps) {
   const bySeverity =
-    risks?.length > 0
+    risks.length > 0
       ? SEVERITY_ORDER.map((sev) => ({
           severity: sev,
           items: risks.filter((r) => r.severity === sev),
