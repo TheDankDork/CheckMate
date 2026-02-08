@@ -6,11 +6,17 @@ from typing import Any, Dict, Optional, Tuple
 from checkmate.schemas import AnalysisResult, Subscores
 
 # (formatting, relevance, sources, risk) — must sum to 1.0
+# Spec: Functional = no sources, equal weight to other 3. Statistical = relevance+sources doubled.
+# News = regular. Company = formatting +15%, 5% taken from each of other 3.
 WEIGHT_BY_TYPE: Dict[str, Tuple[float, float, float, float]] = {
-    "functional": (1.0 / 3 + 0.2 / 3, 1.0 / 3 + 0.2 / 3, 0.0, 0.2 + 0.2 / 3),   # no sources; distribute equally
-    "statistical": (0.1, 0.4, 0.4, 0.1),   # relevance & sources doubled
-    "news_historical": (0.3, 0.3, 0.2, 0.2),   # regular
-    "company": (0.45, 0.25, 0.15, 0.15),   # formatting +15%, 5% from each of other 3
+    # 1. Functional: do not consider sources; distribute weighting equally to the other three
+    "functional": (1.0 / 3, 1.0 / 3, 0.0, 1.0 / 3),
+    # 2. Statistical: relevance and sources doubled, other two reduced; relevance also uses recency (in _score_relevance)
+    "statistical": (0.1, 0.4, 0.4, 0.1),
+    # 3. News / historical: regular weighting
+    "news_historical": (0.3, 0.3, 0.2, 0.2),
+    # 4. Company: sources not weighted much; formatting +15%, 5% taken from each of the other 3
+    "company": (0.45, 0.25, 0.15, 0.15),
 }
 DEFAULT_WEIGHTS = WEIGHT_BY_TYPE["news_historical"]
 

@@ -1,11 +1,13 @@
 import { useState } from "react";
-import type { PageSummary } from "../api/types";
+import type { PageSummary, WebsiteType } from "../api/types";
 
 export interface DetailsAccordionProps {
   pagesAnalyzed?: PageSummary[] | null;
   domainInfo?: Record<string, unknown> | null;
   securityInfo?: Record<string, unknown> | null;
   threatIntel?: Record<string, unknown> | null;
+  websiteType?: WebsiteType | string | null;
+  scoringWeights?: Record<string, number> | null;
 }
 
 function Section({
@@ -65,11 +67,24 @@ function PagesList({ pages }: { pages: PageSummary[] }) {
   );
 }
 
+function websiteTypeLabel(t: string | undefined | null): string {
+  if (!t) return "—";
+  switch (t) {
+    case "functional": return "Functional (utility)";
+    case "statistical": return "Statistical (data)";
+    case "company": return "Company";
+    case "news_historical": return "News / historical";
+    default: return t;
+  }
+}
+
 export function DetailsAccordion({
   pagesAnalyzed,
   domainInfo,
   securityInfo,
   threatIntel,
+  websiteType,
+  scoringWeights,
 }: DetailsAccordionProps) {
   const [openSection, setOpenSection] = useState<string | null>(null);
 
@@ -77,8 +92,9 @@ export function DetailsAccordion({
   const hasDomain = domainInfo && Object.keys(domainInfo).length > 0;
   const hasSecurity = securityInfo && Object.keys(securityInfo).length > 0;
   const hasThreat = threatIntel && Object.keys(threatIntel).length > 0;
+  const hasScoring = (websiteType != null && websiteType !== "") || (scoringWeights && Object.keys(scoringWeights).length > 0);
 
-  if (!hasPages && !hasDomain && !hasSecurity && !hasThreat) return null;
+  if (!hasPages && !hasDomain && !hasSecurity && !hasThreat && !hasScoring) return null;
 
   const toggle = (id: string) =>
     setOpenSection((s) => (s === id ? null : id));
@@ -90,6 +106,26 @@ export function DetailsAccordion({
         Technical details
       </h3>
       <div className="space-y-0">
+        {hasScoring && (
+          <Section
+            title="Website type & scoring"
+            open={openSection === "scoring"}
+            onToggle={() => toggle("scoring")}
+          >
+            <div className="space-y-2">
+              <p>
+                <span className="font-medium text-slate-800">Website type:</span>{" "}
+                {websiteTypeLabel(websiteType ?? undefined)}
+              </p>
+              {scoringWeights && (
+                <p>
+                  <span className="font-medium text-slate-800">Weights used:</span>{" "}
+                  Formatting {Math.round((scoringWeights.formatting ?? 0) * 100)}%, Relevance {Math.round((scoringWeights.relevance ?? 0) * 100)}%, Sources {Math.round((scoringWeights.sources ?? 0) * 100)}%, Safety {Math.round((scoringWeights.risk ?? 0) * 100)}%
+                </p>
+              )}
+            </div>
+          </Section>
+        )}
         {hasPages && (
           <Section
             title="Pages analyzed"

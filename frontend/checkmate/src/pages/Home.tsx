@@ -212,6 +212,11 @@ export function Home({
                       </span>
                     </p>
                   )}
+                  {displayData.debug?.scoring?.weights && (
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Score weights: Formatting {Math.round((displayData.debug.scoring.weights as Record<string, number>).formatting * 100)}%, Relevance {Math.round((displayData.debug.scoring.weights as Record<string, number>).relevance * 100)}%, Sources {Math.round((displayData.debug.scoring.weights as Record<string, number>).sources * 100)}%, Safety {Math.round((displayData.debug.scoring.weights as Record<string, number>).risk * 100)}%
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -239,6 +244,8 @@ export function Home({
                   domainInfo={displayData.domain_info}
                   securityInfo={displayData.security_info}
                   threatIntel={displayData.threat_intel}
+                  websiteType={displayData.website_type}
+                  scoringWeights={displayData.debug?.scoring?.weights as Record<string, number> | undefined}
                 />
               </div>
             </section>

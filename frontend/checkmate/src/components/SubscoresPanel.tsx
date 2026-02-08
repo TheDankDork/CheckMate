@@ -8,7 +8,7 @@ const LABELS: Record<keyof SubscoresType, string> = {
   formatting: "Formatting",
   relevance: "Relevance",
   sources: "Sources",
-  risk: "Risk",
+  risk: "Safety",
 };
 
 function Bar({ value, label }: { value: number; label: string }) {
