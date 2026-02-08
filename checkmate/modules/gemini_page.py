@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
 from dotenv import load_dotenv
@@ -11,6 +12,8 @@ load_dotenv()
 #
 # If your repo uses "google-generativeai" instead, tell me and I'll adapt imports/calls.
 from google import genai  # type: ignore
+
+logger = logging.getLogger(__name__)
 
 
 # Website type for score weighting (classify before full analysis)
@@ -40,7 +43,7 @@ def classify_website_type_with_gemini(page_url: str, page_title: Optional[str], 
     Returns one of: functional, statistical, news_historical, company.
     """
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
+    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
     if not api_key:
         return "news_historical"  # safe default
 
@@ -103,11 +106,9 @@ def _page_schema() -> Dict[str, Any]:
                     "title_body_alignment_0_1",
                     "marketing_heaviness_0_1",
                     "source_traceability_0_1",
-                    "information_recency_0_1",
                     "asks_sensitive_info",
                     "payment_pressure",
                 ],
-                "additionalProperties": False,
             },
             "numeric_claims": {
                 "type": "array",
@@ -121,7 +122,6 @@ def _page_schema() -> Dict[str, Any]:
                         "evidence_snippet": {"type": "string"},
                     },
                     "required": ["claim_text", "value", "has_citation_in_text", "citation_snippet", "evidence_snippet"],
-                    "additionalProperties": False,
                 },
             },
             "risks": {
@@ -135,13 +135,11 @@ def _page_schema() -> Dict[str, Any]:
                         "evidence_snippets": {"type": "array", "items": {"type": "string"}},
                         "notes": {"type": "string"},
                     },
-                    "required": ["severity", "code", "title", "evidence_snippets", "notes"],
-                    "additionalProperties": False,
+                    "required": ["severity", "code", "title", "evidence_snippets"],
                 },
             },
         },
         "required": ["page_url", "page_type", "signals", "numeric_claims", "risks"],
-        "additionalProperties": False,
     }
 
 
@@ -200,6 +198,7 @@ def _build_prompt(
 # -----------------------------
 
 def _fallback_result(page_url: str, reason: str) -> Dict[str, Any]:
+    """Return a safe default when Gemini fails. No risk card—add reason to limitations only."""
     return {
         "page_url": page_url,
         "page_type": "unknown",
@@ -214,15 +213,8 @@ def _fallback_result(page_url: str, reason: str) -> Dict[str, Any]:
             "payment_pressure": False,
         },
         "numeric_claims": [],
-        "risks": [
-            {
-                "severity": "UNCERTAIN",
-                "code": "GEMINI_FAILED",
-                "title": "Gemini page analysis failed",
-                "evidence_snippets": [],
-                "notes": reason,
-            }
-        ],
+        "risks": [],
+        "limitations": [f"Page analysis could not be completed: {reason}"],
     }
 
 
@@ -278,6 +270,7 @@ def _get_client(api_key: str):
 def _call_gemini_json(prompt: str, schema: Dict[str, Any], api_key: str, model: str) -> str:
     """
     One Gemini call returning JSON text. Separated to make mocking easier.
+    Uses response.parsed when available (SDK-parsed JSON); otherwise response.text.
     """
     client = _get_client(api_key)
     resp = client.models.generate_content(
@@ -289,7 +282,35 @@ def _call_gemini_json(prompt: str, schema: Dict[str, Any], api_key: str, model: 
             "response_json_schema": schema,
         },
     )
-    return getattr(resp, "text", "") or ""
+    # Prefer SDK-parsed dict when available (avoids our json.loads failures)
+    parsed = getattr(resp, "parsed", None)
+    if isinstance(parsed, dict):
+        return json.dumps(parsed)
+    text = getattr(resp, "text", "") or ""
+    if not text and getattr(resp, "candidates", None):
+        for c in (resp.candidates or [])[:1]:
+            content = getattr(c, "content", None)
+            if content and getattr(content, "parts", None):
+                for p in (content.parts or [])[:1]:
+                    text = getattr(p, "text", "") or ""
+                    break
+            break
+    if not text:
+        # Diagnose why we got no text (blocked, safety, etc.)
+        msg = "Empty Gemini response"
+        prompt_fb = getattr(resp, "prompt_feedback", None)
+        if prompt_fb is not None:
+            block_reason = getattr(prompt_fb, "block_reason", None) or getattr(prompt_fb, "block_reason_string", None)
+            if block_reason is not None:
+                msg = f"Prompt blocked: {block_reason}"
+        candidates = getattr(resp, "candidates", None) or []
+        if candidates:
+            c0 = candidates[0]
+            finish = getattr(c0, "finish_reason", None) or getattr(c0, "finish_reason_string", None)
+            if finish is not None:
+                msg = f"Response finish_reason: {finish}"
+        logger.warning("Gemini returned no text: %s", msg)
+    return text or ""
 
 
 # -----------------------------
@@ -315,7 +336,7 @@ def analyze_page_with_gemini(
     """
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
+    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
     if not api_key:
         return _fallback_result(page_url, "Missing GEMINI_API_KEY")
 
@@ -338,17 +359,43 @@ def analyze_page_with_gemini(
         if not raw:
             return _fallback_result(page_url, "Empty Gemini response text")
 
+        result = None
         try:
             result = json.loads(raw)
         except Exception:
-            # Retry once with stricter reminder
             raw2 = _call_gemini_json(prompt + "\nREMINDER: Return strict JSON only.", schema, api_key, model)
-            result = json.loads(raw2)
+            if raw2:
+                try:
+                    result = json.loads(raw2)
+                except Exception:
+                    pass
+        if not result or not isinstance(result, dict):
+            return _fallback_result(page_url, "Invalid or empty JSON from Gemini")
+
+        # Normalize: ensure signals and optional fields exist so downstream code doesn't break
+        result.setdefault("signals", {})
+        sig = result["signals"]
+        if not isinstance(sig, dict):
+            sig = {}
+            result["signals"] = sig
+        for key, default in [
+            ("writing_quality_0_1", 0.5),
+            ("cohesion_0_1", 0.5),
+            ("title_body_alignment_0_1", 0.5),
+            ("marketing_heaviness_0_1", 0.5),
+            ("source_traceability_0_1", 0.5),
+            ("information_recency_0_1", 0.5),
+            ("asks_sensitive_info", False),
+            ("payment_pressure", False),
+        ]:
+            if key not in sig or sig[key] is None:
+                sig[key] = default
+        result.setdefault("risks", [])
+        result.setdefault("numeric_claims", [])
 
         # Evidence validation: downgrade to UNCERTAIN if not substring
         limitations = _validate_and_downgrade_evidence(clean_text, result)
         if limitations:
-            # Optional field; pipeline may also maintain limitations list.
             result.setdefault("limitations", [])
             for lim in limitations:
                 result["limitations"].append(lim)
@@ -356,5 +403,14 @@ def analyze_page_with_gemini(
         return result
 
     except Exception as e:
-        print(f"DEBUG: Gemini Error: {e}")
-        return _fallback_result(page_url, f"Exception: {type(e).__name__}: {str(e)}")
+        logger.exception("Gemini page analysis failed: %s", e)
+        reason = str(e)
+        # User-friendly message for quota/rate limit (429)
+        if "429" in reason or "RESOURCE_EXHAUSTED" in reason or "quota" in reason.lower():
+            reason = (
+                "Gemini API rate limit exceeded (free tier is 20 requests/day per model). "
+                "Try again later or set GEMINI_MODEL=gemini-1.5-flash in .env for a separate quota."
+            )
+        else:
+            reason = f"Exception: {type(e).__name__}: {reason}"
+        return _fallback_result(page_url, reason)

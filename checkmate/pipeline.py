@@ -77,20 +77,24 @@ def run_pipeline(url: str) -> AnalysisResult:
     result.debug["gemini"] = gemini_result
     result.limitations.extend(gemini_result.get("limitations", []))
 
-    # Attach Gemini page type and risks
+    # Attach Gemini page type and risks (skip legacy fallback "Gemini page analysis failed" risk)
+    gemini_risks = [
+        r for r in gemini_result.get("risks", [])
+        if (r.get("code") != "GEMINI_FAILED" and (r.get("title") or "").strip() != "Gemini page analysis failed")
+    ]
     result.risks.extend([
-    RiskItem(
-        severity=r["severity"],
-        code=r["code"],
-        title=r["title"],
-        evidence=[
-            {
-                "message": snippet,
-                "snippet": snippet,
-            } for snippet in r.get("evidence_snippets", [])
-        ],
-    )
-    for r in gemini_result.get("risks", [])
+        RiskItem(
+            severity=r["severity"],
+            code=r["code"],
+            title=r["title"],
+            evidence=[
+                {
+                    "message": snippet,
+                    "snippet": snippet,
+                } for snippet in r.get("evidence_snippets", [])
+            ],
+        )
+        for r in gemini_risks
     ])
 
     # Domain Info

@@ -1,6 +1,7 @@
 # Updated app.py for CheckMate to match full pipeline and schema integration
 from __future__ import annotations
 
+import logging
 import os
 from flask import Flask, request, jsonify, send_from_directory
 from checkmate.pipeline import run_pipeline
@@ -8,6 +9,8 @@ from checkmate.scoring import compute_score
 from checkmate.render import render_output
 from checkmate.schemas import AnalyzeRequest
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # CORS: local dev + production frontend (set FRONTEND_URL on Render to your Vercel URL)

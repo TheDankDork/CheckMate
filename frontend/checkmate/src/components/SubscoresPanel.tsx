@@ -11,7 +11,14 @@ const LABELS: Record<keyof SubscoresType, string> = {
   risk: "Safety",
 };
 
-function Bar({ value, label }: { value: number; label: string }) {
+const DESCRIPTIONS: Record<keyof SubscoresType, string> = {
+  formatting: "Writing quality, structure, and how well the title matches the content.",
+  relevance: "How on-topic and trustworthy the content feels; less marketing spin is better.",
+  sources: "Whether claims and data are traceable to cited sources.",
+  risk: "Signals like HTTPS, sensitive data requests, and other safety red flags.",
+};
+
+function Bar({ value, label, description }: { value: number; label: string; description: string }) {
   const num = typeof value === "number" && !Number.isNaN(value) ? value : 0;
   const pct = Math.max(0, Math.min(100, num));
   const color =
@@ -19,10 +26,11 @@ function Bar({ value, label }: { value: number; label: string }) {
 
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-sm">
+      <div className="flex justify-between items-baseline text-sm">
         <span className="font-medium text-slate-700">{label}</span>
         <span className="tabular-nums text-slate-600">{num}</span>
       </div>
+      <p className="text-xs text-slate-500">{description}</p>
       <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
         <div
           className={`h-full rounded-full ${color} transition-all duration-300`}
@@ -55,7 +63,7 @@ export function SubscoresPanel({ subscores }: SubscoresPanelProps) {
       {entries.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {entries.map(({ key, label, value }) => (
-            <Bar key={key} value={value} label={label} />
+            <Bar key={key} value={value} label={label} description={DESCRIPTIONS[key]} />
           ))}
         </div>
       ) : (
