@@ -13,6 +13,61 @@ load_dotenv()
 from google import genai  # type: ignore
 
 
+# Website type for score weighting (classify before full analysis)
+WEBSITE_TYPE_VALUES = ["functional", "statistical", "news_historical", "company"]
+
+
+def _website_type_schema() -> Dict[str, Any]:
+    """Schema for website-type classification only."""
+    return {
+        "type": "object",
+        "properties": {
+            "website_type": {
+                "type": "string",
+                "enum": WEBSITE_TYPE_VALUES,
+                "description": "functional=utility sites (e.g. Amazon, LinkedIn, games); statistical=data-focused; news_historical=news/facts; company=company/corporate sites",
+            },
+        },
+        "required": ["website_type"],
+        "additionalProperties": False,
+    }
+
+
+def classify_website_type_with_gemini(page_url: str, page_title: Optional[str], text_snippet: str) -> str:
+    """
+    Classify the website into one of 4 types for scoring weights.
+    Uses a small prompt and short text to keep latency low.
+    Returns one of: functional, statistical, news_historical, company.
+    """
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    model = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
+    if not api_key:
+        return "news_historical"  # safe default
+
+    snippet = (text_snippet or "")[:4000]  # keep classification fast
+    prompt = (
+        "You are a website classifier. Classify the following website into exactly ONE of these types.\n"
+        "Return JSON only: {\"website_type\": \"<type>\"}\n\n"
+        "Types:\n"
+        "- functional: Sites that provide utility (e.g. Amazon, LinkedIn, gaming, tools, apps, marketplaces). Focus is on function, not citing sources.\n"
+        "- statistical: Sites that present data, statistics, datasets, or numerical reports. Recency of data matters.\n"
+        "- news_historical: News outlets, encyclopedias, historical or educational information. Standard editorial standards.\n"
+        "- company: Corporate or company websites (about us, products, services, careers). Brand and presentation matter more than external sources.\n\n"
+        f"URL: {page_url}\n"
+        f"Title: {page_title or '(none)'}\n"
+        f"Text snippet:\n{snippet}\n"
+    )
+    try:
+        raw = _call_gemini_json(prompt, _website_type_schema(), api_key, model)
+        if not raw:
+            return "news_historical"
+        data = json.loads(raw)
+        t = (data.get("website_type") or "").strip().lower()
+        return t if t in WEBSITE_TYPE_VALUES else "news_historical"
+    except Exception:
+        return "news_historical"
+
+
 # -----------------------------
 # Schema (structured output)
 # -----------------------------
@@ -38,6 +93,7 @@ def _page_schema() -> Dict[str, Any]:
                     "title_body_alignment_0_1": {"type": "number", "minimum": 0, "maximum": 1},
                     "marketing_heaviness_0_1": {"type": "number", "minimum": 0, "maximum": 1},
                     "source_traceability_0_1": {"type": "number", "minimum": 0, "maximum": 1},
+                    "information_recency_0_1": {"type": "number", "minimum": 0, "maximum": 1},
                     "asks_sensitive_info": {"type": "boolean"},
                     "payment_pressure": {"type": "boolean"},
                 },
@@ -47,6 +103,7 @@ def _page_schema() -> Dict[str, Any]:
                     "title_body_alignment_0_1",
                     "marketing_heaviness_0_1",
                     "source_traceability_0_1",
+                    "information_recency_0_1",
                     "asks_sensitive_info",
                     "payment_pressure",
                 ],
@@ -132,6 +189,7 @@ def _build_prompt(
         "3) Extract up to 5 numeric_claims if present.\n"
         "4) Produce up to 8 risks.\n"
         "5) All evidence snippets must be exact substrings of clean_text.\n"
+        "6) information_recency_0_1: for data/statistical content, how up-to-date the information appears (0=outdated, 1=current); otherwise use 0.5.\n"
     )
 
     return system_rules + "\nINPUT_JSON:\n" + json.dumps(payload, ensure_ascii=False) + "\n\n" + task
@@ -151,6 +209,7 @@ def _fallback_result(page_url: str, reason: str) -> Dict[str, Any]:
             "title_body_alignment_0_1": 0.5,
             "marketing_heaviness_0_1": 0.5,
             "source_traceability_0_1": 0.5,
+            "information_recency_0_1": 0.5,
             "asks_sensitive_info": False,
             "payment_pressure": False,
         },

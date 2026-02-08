@@ -29,6 +29,9 @@ class Subscores(BaseModel):
     sources: int
     risk: int
 
+WebsiteType = Literal["functional", "statistical", "news_historical", "company"]
+
+
 class AnalysisResult(BaseModel):
     status: Literal["ok", "na", "error"]
     overall_score: Optional[int] = None
@@ -41,3 +44,4 @@ class AnalysisResult(BaseModel):
     threat_intel: Dict[str, Any] = Field(default_factory=dict)
     limitations: List[str] = Field(default_factory=list)
     debug: Dict[str, Any] = Field(default_factory=dict)
+    website_type: Optional[WebsiteType] = None

@@ -70,4 +70,16 @@ Results are **JSON-first**, with an optional lightweight HTML report.
 
 ---
 
+## Run the website locally
+
+**Teammates:** see **[RUN-LOCALLY.md](RUN-LOCALLY.md)** for step-by-step instructions to run the backend and frontend on your machine and open the app in your browser.
+
+**Quick version:** Two terminals — (1) `pip install -r requirements.txt` then `python app.py`; (2) `cd frontend/checkmate && npm install && npm run dev` — then open **http://localhost:5173**. You need a `.env` with `GEMINI_API_KEY` (copy from `.env.example`).
+
+## Host the website (Render + Vercel)
+
+**Step-by-step:** see **[HOST-STEP-BY-STEP.md](HOST-STEP-BY-STEP.md)** to put the API on Render and the frontend on Vercel so the app is live on the internet.
+
+---
+
 **CheckMate surfaces signals, not verdicts — helping users and systems make better decisions about online content.**

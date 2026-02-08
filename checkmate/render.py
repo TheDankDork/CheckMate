@@ -9,7 +9,8 @@ def render_output(result: AnalysisResult) -> Dict[str, Any]:
     output: Dict[str, Any] = {
         "status": result.status,
         "overall_score": result.overall_score,
-        "subscores": result.subscores.dict() if result.subscores else None,
+        "website_type": result.website_type,
+        "subscores": result.subscores.model_dump() if result.subscores else None,
         "risks": [
             {
                 "severity": r.severity,

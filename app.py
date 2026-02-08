@@ -10,22 +10,30 @@ from checkmate.schemas import AnalyzeRequest
 
 app = Flask(__name__)
 
+# CORS: local dev + production frontend (set FRONTEND_URL on Render to your Vercel URL)
+_ALLOWED = os.environ.get("FRONTEND_URL", "").strip().split(",") if os.environ.get("FRONTEND_URL") else []
 ALLOWED_ORIGINS = {
     "http://localhost:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
+    *(_ALLOWED if _ALLOWED else []),
 }
+
+
+def _cors_origin(request_origin: str | None) -> str:
+    if request_origin and request_origin in ALLOWED_ORIGINS:
+        return request_origin
+    if request_origin and request_origin.rstrip("/").endswith(".vercel.app"):
+        return request_origin
+    return "http://localhost:5173"
 
 
 @app.after_request
 def add_cors_headers(response):
-    """Allow frontend (different port) to call this API."""
+    """Allow frontend (different port or Vercel) to call this API."""
     origin = getattr(request, "origin", None)
-    if origin in ALLOWED_ORIGINS:
-        response.headers["Access-Control-Allow-Origin"] = origin
-    else:
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
+    response.headers["Access-Control-Allow-Origin"] = _cors_origin(origin)
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     return response

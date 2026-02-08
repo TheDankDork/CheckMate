@@ -12,6 +12,7 @@ import { DetailsAccordion } from "../components/DetailsAccordion";
 export const MOCK_RESULT: AnalyzeResponse = {
   status: "ok",
   overall_score: 72,
+  website_type: "news_historical",
   subscores: {
     formatting: 85,
     relevance: 70,
@@ -196,6 +197,20 @@ export function Home({
                   <h2 className="text-2xl font-bold tracking-tight text-slate-900">Results</h2>
                   {lastRequestUrl && (
                     <p className="mt-1 text-sm text-slate-500">Analyzed: {lastRequestUrl}</p>
+                  )}
+                  {displayData.website_type && (
+                    <p className="mt-0.5 text-sm text-slate-600">
+                      Classified as:{" "}
+                      <span className="font-medium text-slate-800">
+                        {displayData.website_type === "functional"
+                          ? "Functional (utility)"
+                          : displayData.website_type === "statistical"
+                            ? "Statistical (data)"
+                            : displayData.website_type === "company"
+                              ? "Company"
+                              : "News / historical"}
+                      </span>
+                    </p>
                   )}
                 </div>
                 <button

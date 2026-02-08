@@ -35,9 +35,12 @@ export interface Subscores {
   risk: number;
 }
 
+export type WebsiteType = "functional" | "statistical" | "news_historical" | "company";
+
 export interface AnalyzeResponse {
   status: AnalyzeStatus;
   overall_score: number | null;
+  website_type?: WebsiteType | null;
   subscores?: Subscores;
   risks?: RiskItem[];
   missing_pages?: string[];

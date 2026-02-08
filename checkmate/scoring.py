@@ -1,9 +1,25 @@
 # Updated scoring.py to match CheckMate pipeline structure
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from checkmate.schemas import AnalysisResult, Subscores
+
+# (formatting, relevance, sources, risk) — must sum to 1.0
+WEIGHT_BY_TYPE: Dict[str, Tuple[float, float, float, float]] = {
+    "functional": (1.0 / 3 + 0.2 / 3, 1.0 / 3 + 0.2 / 3, 0.0, 0.2 + 0.2 / 3),   # no sources; distribute equally
+    "statistical": (0.1, 0.4, 0.4, 0.1),   # relevance & sources doubled
+    "news_historical": (0.3, 0.3, 0.2, 0.2),   # regular
+    "company": (0.45, 0.25, 0.15, 0.15),   # formatting +15%, 5% from each of other 3
+}
+DEFAULT_WEIGHTS = WEIGHT_BY_TYPE["news_historical"]
+
+
+def _weights_for_type(website_type: Optional[str]) -> Tuple[float, float, float, float]:
+    if website_type and website_type in WEIGHT_BY_TYPE:
+        return WEIGHT_BY_TYPE[website_type]
+    return DEFAULT_WEIGHTS
+
 
 def compute_score(result: AnalysisResult) -> AnalysisResult:
     if result.status != "ok":
@@ -16,7 +32,7 @@ def compute_score(result: AnalysisResult) -> AnalysisResult:
     # Format Score
     formatting = _score_formatting(result, debug)
 
-    # Relevance Score
+    # Relevance Score (for statistical type, blend in information_recency)
     relevance = _score_relevance(result, debug)
 
     # Source Score
@@ -25,9 +41,13 @@ def compute_score(result: AnalysisResult) -> AnalysisResult:
     # Risk Score (higher risk = lower score)
     risk_score = _score_risk(result, debug)
 
-    # Weighted total (max 100)
-    # You can change weights later as needed
-    score = int(0.3 * formatting + 0.3 * relevance + 0.2 * sources + 0.2 * risk_score)
+    # Type-specific weights
+    w_f, w_r, w_s, w_risk = _weights_for_type(result.website_type)
+    debug["website_type"] = result.website_type or "news_historical"
+    debug["weights"] = {"formatting": w_f, "relevance": w_r, "sources": w_s, "risk": w_risk}
+
+    score = int(w_f * formatting + w_r * relevance + w_s * sources + w_risk * risk_score)
+    score = max(0, min(100, score))
 
     result.subscores = Subscores(
         formatting=formatting,
@@ -59,11 +79,18 @@ def _score_relevance(result: AnalysisResult, debug: Dict[str, Any]) -> int:
     gemini = result.debug.get("gemini", {}).get("signals", {})
     marketing = gemini.get("marketing_heaviness_0_1", 0.5)
     relevance = 1.0 - marketing
+    # For statistical sites, factor in how up-to-date the information is
+    if result.website_type == "statistical":
+        recency = gemini.get("information_recency_0_1", 0.5)
+        relevance = 0.6 * relevance + 0.4 * recency
     relevance_score = int(relevance * 100)
+    relevance_score = max(0, min(100, relevance_score))
     debug["relevance"] = {
         "marketing": marketing,
         "score": relevance_score,
     }
+    if result.website_type == "statistical":
+        debug["relevance"]["information_recency_0_1"] = gemini.get("information_recency_0_1", 0.5)
     return relevance_score
 
 def _score_sources(result: AnalysisResult, debug: Dict[str, Any]) -> int:
@@ -84,9 +111,6 @@ def _score_risk(result: AnalysisResult, debug: Dict[str, Any]) -> int:
 
     score = 100
     deductions = []
-    print("ALL RISKS TYPE:", type(result.risks))
-    if result.risks:
-        print("FIRST RISK TYPE:", type(result.risks[0]))
     for risk in result.risks:
         if risk.severity == "HIGH":
             score -= 30

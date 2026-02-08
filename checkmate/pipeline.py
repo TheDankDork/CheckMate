@@ -11,7 +11,7 @@ from checkmate.modules.extraction import extract_page_features, truncate_clean_t
 from checkmate.modules.domain_info import get_domain_info
 from checkmate.modules.security_check import check_security
 from checkmate.modules.threat_intel import match_url
-from checkmate.modules.gemini_page import analyze_page_with_gemini
+from checkmate.modules.gemini_page import analyze_page_with_gemini, classify_website_type_with_gemini
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,16 @@ def run_pipeline(url: str) -> AnalysisResult:
         page_features.get("title"),
         page_features.get("headings", [])
     )
+
+    # Classify website type first (for score weighting)
+    text_snippet = (page_features.get("clean_text", "") or "")[:4000]
+    website_type = classify_website_type_with_gemini(
+        page_url=url,
+        page_title=page_features.get("title"),
+        text_snippet=text_snippet,
+    )
+    result.website_type = website_type
+    result.debug["website_type"] = website_type
 
     # Gemini Analysis
     gemini_result = analyze_page_with_gemini(
