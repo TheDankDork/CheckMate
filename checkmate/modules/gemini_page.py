@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -19,12 +21,81 @@ logger = logging.getLogger(__name__)
 
 # On 429, wait this many seconds then retry once; then try alternate model
 GEMINI_429_RETRY_DELAY = 45
-# Alternate model to try on 429 (different quota bucket; e.g. gemini-2.0-flash-lite)
-GEMINI_429_ALTERNATE_MODEL = "gemini-2.0-flash-lite"
+# Alternate model to try on 429 (different quota bucket)
+GEMINI_429_ALTERNATE_MODEL = "gemini-2.0-flash"
 
 
 # Website type for score weighting (classify before full analysis)
 WEBSITE_TYPE_VALUES = ["functional", "statistical", "news_historical", "company"]
+
+# Domains (or hostnames) that are known news/encyclopedia/educational — do not override to company
+KNOWN_NEWS_OR_ENCYCLOPEDIA_DOMAINS = frozenset({
+    "wikipedia.org", "bbc.com", "bbc.co.uk", "reuters.com", "nytimes.com",
+    "theguardian.com", "apnews.com", "npr.org", "cnn.com", "washingtonpost.com",
+    "britannica.com", "history.com",
+})
+
+# Substrings that suggest a news/encyclopedia domain (for unknown domains)
+NEWS_DOMAIN_SUBSTRINGS = frozenset({
+    "news", "wiki", "reuters", "bbc", "nyt", "times", "post", "guardian",
+    "apnews", "npr", "cnn", "washington", "britannica", "history", "edu",
+})
+
+# Keywords that strongly suggest a company/corporate site (nav, headings)
+COMPANY_SIGNAL_PATTERN = re.compile(
+    r"\b(careers?|about\s+us|contact\s+us|join\s+us|open\s+roles?|our\s+team|"
+    r"products?\s+and\s+services|investor\s+relations|press\s+release|"
+    r"departments?|internships?|culture|who\s+we\s+are|what\s+we\s+do)\b",
+    re.I,
+)
+
+
+def _domain_from_url(url: str) -> str:
+    try:
+        parsed = urlparse(url)
+        netloc = (parsed.netloc or "").strip().lower()
+        if not netloc and parsed.path:
+            # URL may be "janestreet.com" or "www.janestreet.com" without scheme
+            netloc = parsed.path.strip().lower().split("/")[0].split("?")[0]
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
+        return netloc
+    except Exception:
+        return ""
+
+
+def _domain_looks_like_news_or_encyclopedia(domain: str) -> bool:
+    """True if domain is clearly news/encyclopedia/educational (do not treat as company)."""
+    if not domain:
+        return False
+    if domain in KNOWN_NEWS_OR_ENCYCLOPEDIA_DOMAINS or domain.endswith(".edu"):
+        return True
+    domain_lower = domain.lower()
+    return any(sub in domain_lower for sub in NEWS_DOMAIN_SUBSTRINGS)
+
+
+def website_type_from_domain(url: str) -> Optional[str]:
+    """
+    If the URL's domain clearly indicates a company site (not news/encyclopedia), return "company".
+    Otherwise return None (caller should use Gemini). Use this in the pipeline before calling the classifier.
+    """
+    domain = _domain_from_url(url)
+    if not domain:
+        return None
+    if _domain_looks_like_news_or_encyclopedia(domain):
+        return None
+    return "company"
+
+
+def _looks_like_company_site(page_url: str, page_title: Optional[str], text_snippet: str) -> bool:
+    """True if domain is not a known news/encyclopedia site and content has strong company signals."""
+    domain = _domain_from_url(page_url)
+    if not domain:
+        return False
+    if _domain_looks_like_news_or_encyclopedia(domain):
+        return False
+    combined = " ".join(filter(None, [page_title or "", (text_snippet or "")[:2500]]))
+    return bool(COMPANY_SIGNAL_PATTERN.search(combined))
 
 
 def _website_type_schema() -> Dict[str, Any]:
@@ -43,6 +114,22 @@ def _website_type_schema() -> Dict[str, Any]:
     }
 
 
+def _resolve_website_type(
+    raw_type: str, page_url: str, page_title: Optional[str], text_snippet: str
+) -> str:
+    """Apply fallback: if result is news_historical but site looks like company, return company."""
+    if raw_type != "news_historical":
+        return raw_type
+    domain = _domain_from_url(page_url)
+    # If domain is clearly not news/encyclopedia (e.g. janestreet.com, stripe.com), treat as company
+    if domain and not _domain_looks_like_news_or_encyclopedia(domain):
+        return "company"
+    # Else check content signals (e.g. careers, about us)
+    if _looks_like_company_site(page_url, page_title, text_snippet):
+        return "company"
+    return "news_historical"
+
+
 def classify_website_type_with_gemini(page_url: str, page_title: Optional[str], text_snippet: str) -> str:
     """
     Classify the website into one of 4 types for scoring weights.
@@ -50,33 +137,46 @@ def classify_website_type_with_gemini(page_url: str, page_title: Optional[str], 
     Returns one of: functional, statistical, news_historical, company.
     """
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
-    if not api_key:
-        return "news_historical"  # safe default
-
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
     snippet = (text_snippet or "")[:4000]  # keep classification fast
+
+    def fallback() -> str:
+        return _resolve_website_type("news_historical", page_url, page_title, snippet)
+
+    if not api_key:
+        return fallback()
+
+    domain = _domain_from_url(page_url)
     prompt = (
         "You are a website classifier. Classify the following website into exactly ONE of these types.\n"
         "Return JSON only: {\"website_type\": \"<type>\"}\n\n"
+        "CRITICAL — Use the URL first: The domain is the strongest signal. "
+        "If the URL is a company or brand domain (e.g. janestreet.com, stripe.com, apple.com, acme.com), the type is company. "
+        "Only choose news_historical for domains that are clearly news outlets, encyclopedias, or educational sites (e.g. reuters.com, bbc.com, wikipedia.org). "
+        "A company's own 'news' or 'blog' or 'our story' page is still company.\n\n"
         "Types:\n"
-        "- functional: Sites that provide utility (e.g. Amazon, LinkedIn, gaming, tools, apps, marketplaces). Focus is on function, not citing sources.\n"
-        "- statistical: Sites that present data, statistics, datasets, or numerical reports. Recency of data matters.\n"
-        "- news_historical: Third-party news outlets, encyclopedias (e.g. Wikipedia), or dedicated educational/historical content sites. NOT company-owned pages: a company's own 'news' or 'our story' pages are company sites.\n"
-        "- company: Any corporate or business website: about us, products, services, careers, brand, investor relations, press releases. If the site primarily represents one organization or brand, choose company—even if it has a news section or company history.\n\n"
-        "Rule: When the site is clearly for a single business, brand, or organization (e.g. acme.com, bigcorp.com), use company. Use news_historical only for independent news/media, encyclopedias, or educational/historical resources.\n\n"
+        "- functional: Utility sites (e.g. Amazon, LinkedIn, gaming, tools, apps, marketplaces).\n"
+        "- statistical: Data, statistics, datasets, or numerical reports. Recency matters.\n"
+        "- news_historical: Third-party news, encyclopedias, or dedicated educational/historical sites only.\n"
+        "- company: Any corporate/business site: about us, products, services, careers, brand. One organization's site = company.\n\n"
         f"URL: {page_url}\n"
+        f"Domain: {domain or '(unknown)'}\n"
         f"Title: {page_title or '(none)'}\n"
         f"Text snippet:\n{snippet}\n"
     )
     try:
         raw = _call_gemini_json(prompt, _website_type_schema(), api_key, model)
         if not raw:
-            return "news_historical"
+            return fallback()
         data = json.loads(raw)
         t = (data.get("website_type") or "").strip().lower()
-        return t if t in WEBSITE_TYPE_VALUES else "news_historical"
+        out = t if t in WEBSITE_TYPE_VALUES else "news_historical"
+        out = _resolve_website_type(out, page_url, page_title, snippet)
+        if os.getenv("CHECKMATE_DEBUG_CLASSIFY"):
+            logger.info("classify_website_type url=%s title=%s raw=%s -> %s", page_url, page_title, raw, out)
+        return out
     except Exception:
-        return "news_historical"
+        return fallback()
 
 
 # -----------------------------
@@ -350,7 +450,7 @@ def analyze_page_with_gemini(
     """
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
     if not api_key:
         return _fallback_result(page_url, "Missing GEMINI_API_KEY")
 

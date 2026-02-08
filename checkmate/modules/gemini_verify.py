@@ -19,7 +19,7 @@ def verify_claims(
         mode: "grounding" (uses google_search tool) or "external_snippets" (uses provided context)
     """
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
     
     if not api_key:
         return {"verifications": []}

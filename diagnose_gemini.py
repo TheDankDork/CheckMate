@@ -16,7 +16,7 @@ load_dotenv()
 
 def main():
     api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
-    model = (os.getenv("GEMINI_MODEL") or "gemini-2.0-flash").strip()
+    model = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").strip()
     print("Config:")
     print(f"  GEMINI_API_KEY: {'(set, len=%d)' % len(api_key) if api_key else '(NOT SET)'}")
     print(f"  GEMINI_MODEL: {model!r}")
