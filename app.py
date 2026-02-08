@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from checkmate.pipeline import run_pipeline
-from checkmate.scoring import compute_scores
-from checkmate.render import render_result
+from checkmate.scoring import compute_score
+from checkmate.render import render_output
 from checkmate.schemas import AnalyzeRequest
 
 app = Flask(__name__)
+
+@app.route("/", methods=["GET"])
+def home():
+    return send_from_directory('.', "index.html")
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
@@ -18,9 +22,9 @@ def analyze():
         result = run_pipeline(parsed.url)
 
         if result.status == "ok":
-            result = compute_scores(result)
+            result = compute_score(result)
 
-        rendered = render_result(result)
+        rendered = render_output(result)
         return jsonify(rendered)
 
     except Exception as e:
