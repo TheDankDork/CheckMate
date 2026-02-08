@@ -16,7 +16,7 @@ WEIGHT_BY_TYPE: Dict[str, Tuple[float, float, float, float]] = {
     # 3. News / historical: regular weighting
     "news_historical": (0.3, 0.3, 0.2, 0.2),
     # 4. Company: sources not weighted much; formatting +15%, 5% taken from each of the other 3
-    "company": (0.45, 0.25, 0.15, 0.15),
+    "company": (0.45, 0.30, 0.10, 0.15),
 }
 DEFAULT_WEIGHTS = WEIGHT_BY_TYPE["news_historical"]
 
@@ -108,6 +108,32 @@ def _score_sources(result: AnalysisResult, debug: Dict[str, Any]) -> int:
         "score": score,
     }
     return score
+
+def _is_content_safety_risk(result: AnalysisResult, risk: Any) -> bool:
+    if result.website_type != "news_historical":
+        return False
+    code = (getattr(risk, "code", "") or "").strip().upper()
+    title = (getattr(risk, "title", "") or "").strip().lower()
+    if code == "CONTENT_SAFETY":
+        return True
+    topic_keywords = (
+        "content safety",
+        "topic safety",
+        "dangerous topic",
+        "dangerous content",
+        "unsafe content",
+        "extreme weather",
+        "extreme cold",
+        "extreme heat",
+        "storm",
+        "hurricane",
+        "tornado",
+        "earthquake",
+        "wildfire",
+        "flood",
+        "disaster",
+    )
+    return any(keyword in title for keyword in topic_keywords)
 
 def _score_risk(result: AnalysisResult, debug: Dict[str, Any]) -> int:
     # Risk score goes down with HIGH/MED risks and presence of payment/sensitive info
