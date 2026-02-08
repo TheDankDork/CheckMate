@@ -1,13 +1,15 @@
 /**
  * CheckMate API client.
  *
- * Set VITE_API_BASE_URL in .env (e.g. VITE_API_BASE_URL=https://api.example.com)
- * to point at the backend. If unset, defaults to http://localhost:5000.
+ * In dev: uses relative /api (Vite proxies to http://localhost:5000) — no CORS.
+ * In prod: set VITE_API_BASE_URL to your backend (e.g. https://api.example.com).
  */
 
 import type { AnalyzeResponse } from "./types";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000";
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? "/api" : "http://localhost:5000");
 const REQUEST_TIMEOUT_MS = 35000;
 
 export async function postAnalyze(url: string): Promise<AnalyzeResponse> {
@@ -15,7 +17,8 @@ export async function postAnalyze(url: string): Promise<AnalyzeResponse> {
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const res = await fetch(`${BASE_URL}/analyze`, {
+    const apiUrl = `${BASE_URL.replace(/\/$/, "")}/analyze`;
+    const res = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),

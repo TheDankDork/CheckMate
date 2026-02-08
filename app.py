@@ -4,23 +4,47 @@ from __future__ import annotations
 import os
 from flask import Flask, request, jsonify
 from checkmate.pipeline import run_pipeline
-from checkmate.scoring import compute_scores
-from checkmate.render import render_result
+from checkmate.scoring import compute_score
+from checkmate.render import render_output
 from checkmate.schemas import AnalyzeRequest
 
 app = Flask(__name__)
 
-@app.route("/analyze", methods=["POST"])
+
+ALLOWED_ORIGINS = {
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+}
+
+
+@app.after_request
+def add_cors_headers(response):
+    """Allow frontend (different port) to call this API."""
+    origin = getattr(request, "origin", None)
+    if origin in ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
+
+
+@app.route("/analyze", methods=["POST", "OPTIONS"])
 def analyze():
+    if request.method == "OPTIONS":
+        return "", 204
     try:
         data = request.get_json()
         parsed = AnalyzeRequest(**data)
         result = run_pipeline(parsed.url)
 
         if result.status == "ok":
-            result = compute_scores(result)
+            result = compute_score(result)
 
-        rendered = render_result(result)
+        rendered = render_output(result)
         return jsonify(rendered)
 
     except Exception as e:

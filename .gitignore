@@ -2,7 +2,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Secrets — never commit .env
+# Secrets — never commit .env or env files with secrets
 .env
 .env.local
 .env.*.local
+test.env
