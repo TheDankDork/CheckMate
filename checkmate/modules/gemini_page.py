@@ -306,6 +306,10 @@ def _build_prompt(
         "2) Fill signals with floats 0-1 and booleans.\n"
         "3) Extract up to 5 numeric_claims if present.\n"
         "4) Produce up to 8 risks.\n"
+        "   - Risks must be about the site's trustworthiness or safety (e.g., scams, malware, impersonation,\n"
+        "     misleading claims, data collection pressure). Do NOT flag risks solely because the topic is\n"
+        "     dangerous or alarming (e.g., extreme weather, disasters, crime reports).\n"
+        "   - If you feel compelled to mention topic danger anyway, set code=CONTENT_SAFETY and severity=LOW.\n"
         "5) All evidence snippets must be exact substrings of clean_text.\n"
         "6) information_recency_0_1: for data/statistical content, how up-to-date the information appears (0=outdated, 1=current); otherwise use 0.5.\n"
     )
