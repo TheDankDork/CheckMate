@@ -1,3 +1,40 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --color-surface: 255 255 255;
+    --color-text: 15 23 42;
+    --color-text-muted: 100 116 139;
+    --color-severity-high: 185 28 28;
+    --color-severity-med: 180 83 9;
+    --color-severity-low: 22 163 74;
+    --accent: 16 185 129;
+  }
+  html {
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+  body {
+    @apply antialiased text-slate-900;
+    background: linear-gradient(165deg, #f0fdf4 0%, #ecfdf5 12%, #f1f5f9 35%, #f8fafc 70%, #e2e8f0 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200/90 bg-white/95 p-6 shadow-md backdrop-blur-sm;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  }
+  .card-tight {
+    @apply rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-md backdrop-blur-sm;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  }
+  .section-title {
+    @apply text-base font-semibold tracking-tight text-slate-800;
+  }
+  .accent-bar {
+    @apply h-1 w-12 rounded-full bg-emerald-500;
+  }
+}

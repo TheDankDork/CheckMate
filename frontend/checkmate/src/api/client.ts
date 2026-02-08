@@ -8,23 +8,42 @@
 import type { AnalyzeResponse } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000";
+const REQUEST_TIMEOUT_MS = 35000;
 
 export async function postAnalyze(url: string): Promise<AnalyzeResponse> {
-  const res = await fetch(`${BASE_URL}/analyze`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  const json = await res.json().catch(() => ({}));
+  try {
+    const res = await fetch(`${BASE_URL}/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
 
-  if (!res.ok) {
-    const message =
-      typeof json?.message === "string"
-        ? json.message
-        : `Request failed (${res.status})`;
-    throw new Error(message);
+    const text = await res.text();
+    const json = text ? (() => { try { return JSON.parse(text); } catch { return {}; } })() : {};
+
+    if (!res.ok) {
+      const message =
+        typeof json?.message === "string"
+          ? json.message
+          : typeof json?.error === "string"
+            ? json.error
+            : `Request failed (${res.status})`;
+      throw new Error(message);
+    }
+
+    return (json as AnalyzeResponse) || { status: "error", overall_score: null };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error) {
+      if (err.name === "AbortError")
+        throw new Error("Request timed out. The analysis can take up to 30 seconds—please try again.");
+      throw err;
+    }
+    throw new Error("Network or server error. Try again or analyze another URL.");
   }
-
-  return json as AnalyzeResponse;
 }

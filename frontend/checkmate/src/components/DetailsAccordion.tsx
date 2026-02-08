@@ -24,11 +24,12 @@ function Section({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between py-3 text-left font-medium text-slate-800 hover:text-slate-900"
+        className="flex w-full items-center justify-between py-3 text-left font-medium text-slate-800 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-inset min-h-[44px]"
         aria-expanded={open}
+        id={title.replace(/\s+/g, "-").toLowerCase()}
       >
         {title}
-        <span className="text-slate-400" aria-hidden>
+        <span className="text-slate-400 shrink-0" aria-hidden>
           {open ? "−" : "+"}
         </span>
       </button>
@@ -83,8 +84,9 @@ export function DetailsAccordion({
     setOpenSection((s) => (s === id ? null : id));
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-lg font-semibold text-slate-800">
+    <div className="card">
+      <div className="h-1 w-10 rounded-full bg-slate-400 mb-4" aria-hidden />
+      <h3 className="section-title mb-4">
         Technical details
       </h3>
       <div className="space-y-0">

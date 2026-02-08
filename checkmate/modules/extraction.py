@@ -32,8 +32,7 @@ def extract_page_features(html: str, base_url: str) -> Dict[str, Any]:
     headings = []
     for h in soup.find_all(['h1', 'h2', 'h3']):
         text = h.get_text(strip=True)
-        if text:
-            headings.append(text)
+i            headings.append(text)
 
     # 3. Meta tags
     meta = {}

@@ -11,11 +11,11 @@ export function LimitationsBanner({ analysisLimited, limitations }: LimitationsB
 
   return (
     <div
-      className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm"
+      className="card rounded-2xl border-2 border-amber-200 bg-amber-50/95 p-5"
       role="alert"
       aria-label="Analysis limitations"
     >
-      <h3 className="flex items-center gap-2 text-base font-semibold text-amber-900">
+      <h3 className="section-title flex items-center gap-2 text-amber-900">
         <span aria-hidden>⚠</span> Analysis limitations
       </h3>
       {analysisLimited && items.length === 0 && (

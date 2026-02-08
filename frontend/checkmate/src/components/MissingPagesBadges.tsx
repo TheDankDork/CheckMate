@@ -21,8 +21,9 @@ export function MissingPagesBadges({ missingPages }: MissingPagesBadgesProps) {
   if (!missingPages?.length) return null;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h3 className="mb-3 text-lg font-semibold text-slate-800">Missing pages</h3>
+    <div className="card">
+      <div className="h-1 w-10 rounded-full bg-amber-400 mb-3" aria-hidden />
+      <h3 className="section-title mb-3">Missing pages</h3>
       <p className="mb-3 text-sm text-slate-600">
         These expected pages were not found or could not be analyzed.
       </p>

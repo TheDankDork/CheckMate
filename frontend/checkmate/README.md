@@ -1,3 +1,15 @@
+# CheckMate — Frontend
+
+React + TypeScript + Vite frontend for the CheckMate website legitimacy checker.
+
+## API
+
+The app talks to the CheckMate backend for analysis. Set the backend URL with:
+
+- **`VITE_API_BASE_URL`** — e.g. `https://api.example.com` or `http://localhost:5000` (default). Used only for `POST /analyze`. Create a `.env` in this directory with `VITE_API_BASE_URL=...` if needed.
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

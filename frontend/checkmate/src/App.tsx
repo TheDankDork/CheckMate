@@ -27,9 +27,9 @@ function App() {
     try {
       const response = await postAnalyze(normalized);
       setData(response);
-      setState("success");
+      setState(response.status === "na" ? "na" : "success");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Network or server error");
+      setError(e instanceof Error ? e.message : "Something went wrong. Try again or analyze another URL.");
       setState("error");
     }
   }, []);
