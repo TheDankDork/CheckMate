@@ -5,13 +5,13 @@ import logging
 from typing import List
 from urllib.parse import urlparse
 
-from checkmate.schemas import AnalysisResult
+from checkmate.schemas import AnalysisResult, RiskItem, PageSummary
 from checkmate.safe_fetch import safe_fetch
-from checkmate.extraction import extract_page_features, truncate_clean_text
-from checkmate.domain_info import get_domain_info
-from checkmate.security_check import check_security
-from checkmate.threat_intel import match_url
-from checkmate.gemini_page import analyze_page_with_gemini
+from checkmate.modules.extraction import extract_page_features, truncate_clean_text
+from checkmate.modules.domain_info import get_domain_info
+from checkmate.modules.security_check import check_security
+from checkmate.modules.threat_intel import match_url
+from checkmate.modules.gemini_page import analyze_page_with_gemini
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +31,12 @@ def run_pipeline(url: str) -> AnalysisResult:
 
     result.status = "ok"
     result.pages_analyzed.append(
-        {
-            "url": final_url or url,
-            "status_code": status_code
-        }
+        PageSummary(
+            url=final_url or url,
+            status_code=status_code,
+            title=None,
+            extracted_date=None
+        )
     )
 
     # Feature Extraction
@@ -64,18 +66,18 @@ def run_pipeline(url: str) -> AnalysisResult:
 
     # Attach Gemini page type and risks
     result.risks.extend([
-        {
-            "severity": r["severity"],
-            "code": r["code"],
-            "title": r["title"],
-            "evidence": [
-                {
-                    "message": snippet,
-                    "snippet": snippet,
-                } for snippet in r.get("evidence_snippets", [])
-            ],
-        }
-        for r in gemini_result.get("risks", [])
+    RiskItem(
+        severity=r["severity"],
+        code=r["code"],
+        title=r["title"],
+        evidence=[
+            {
+                "message": snippet,
+                "snippet": snippet,
+            } for snippet in r.get("evidence_snippets", [])
+        ],
+    )
+    for r in gemini_result.get("risks", [])
     ])
 
     # Domain Info
