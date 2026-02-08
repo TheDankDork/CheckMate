@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import type { AnalyzeResponse } from "../api/types";
 import { UrlInputCard } from "../components/UrlInputCard";
 import { ScoreHero } from "../components/ScoreHero";
+import { ScoreBar } from "../components/ScoreBar";
 import { SubscoresPanel } from "../components/SubscoresPanel";
 import { RisksPanel } from "../components/RisksPanel";
 import { MissingPagesBadges } from "../components/MissingPagesBadges";
@@ -229,6 +230,7 @@ export function Home({
                   overallScore={displayData.overall_score}
                   status={displayData.status}
                 />
+                <ScoreBar score={displayData.overall_score ?? null} />
                 <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Website type</p>
                   <p className="mt-1 font-medium text-slate-800">
