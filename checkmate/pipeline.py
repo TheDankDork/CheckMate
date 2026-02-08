@@ -54,6 +54,9 @@ def run_pipeline(url: str) -> AnalysisResult:
         page_title=page_features.get("title"),
         text_snippet=text_snippet,
     )
+    # Normalize to a known type (classifier can return unexpected value on parse failure)
+    if website_type not in ("functional", "statistical", "news_historical", "company"):
+        website_type = "news_historical"
     result.website_type = website_type
     result.debug["website_type"] = website_type
 

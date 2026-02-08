@@ -191,6 +191,11 @@ export function Home({
 
           {displayData && (
             <section aria-live="polite" aria-label="Analysis results" className="space-y-6">
+              {(() => {
+                const websiteType = displayData.website_type ?? displayData.debug?.website_type ?? displayData.debug?.scoring?.website_type ?? (displayData.overall_score != null ? "news_historical" : null);
+                const websiteTypeLabel = websiteType === "functional" ? "Functional (utility)" : websiteType === "statistical" ? "Statistical (data)" : websiteType === "company" ? "Company" : websiteType === "news_historical" ? "News / historical" : (displayData.overall_score != null ? "News / historical" : null);
+                return (
+              <>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="h-1 w-10 rounded-full bg-emerald-500 mb-2" aria-hidden />
@@ -198,20 +203,12 @@ export function Home({
                   {lastRequestUrl && (
                     <p className="mt-1 text-sm text-slate-500">Analyzed: {lastRequestUrl}</p>
                   )}
-                  {displayData.website_type && (
-                    <p className="mt-0.5 text-sm text-slate-600">
-                      Classified as:{" "}
-                      <span className="font-medium text-slate-800">
-                        {displayData.website_type === "functional"
-                          ? "Functional (utility)"
-                          : displayData.website_type === "statistical"
-                            ? "Statistical (data)"
-                            : displayData.website_type === "company"
-                              ? "Company"
-                              : "News / historical"}
-                      </span>
-                    </p>
-                  )}
+                  <p className="mt-0.5 text-sm text-slate-600">
+                    Website type:{" "}
+                    <span className="font-medium text-slate-800">
+                      {websiteTypeLabel ?? "—"}
+                    </span>
+                  </p>
                   {displayData.debug?.scoring?.weights && (
                     <p className="mt-0.5 text-xs text-slate-500">
                       Score weights: Formatting {Math.round((displayData.debug.scoring.weights as Record<string, number>).formatting * 100)}%, Relevance {Math.round((displayData.debug.scoring.weights as Record<string, number>).relevance * 100)}%, Sources {Math.round((displayData.debug.scoring.weights as Record<string, number>).sources * 100)}%, Safety {Math.round((displayData.debug.scoring.weights as Record<string, number>).risk * 100)}%
@@ -232,6 +229,12 @@ export function Home({
                   overallScore={displayData.overall_score}
                   status={displayData.status}
                 />
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Website type</p>
+                  <p className="mt-1 font-medium text-slate-800">
+                    {websiteTypeLabel ?? "Not classified"}
+                  </p>
+                </div>
                 <SubscoresPanel subscores={displayData.subscores} />
                 <RisksPanel risks={displayData.risks} />
                 <MissingPagesBadges missingPages={displayData.missing_pages} />
@@ -244,10 +247,13 @@ export function Home({
                   domainInfo={displayData.domain_info}
                   securityInfo={displayData.security_info}
                   threatIntel={displayData.threat_intel}
-                  websiteType={displayData.website_type}
+                  websiteType={websiteType ?? displayData.website_type}
                   scoringWeights={displayData.debug?.scoring?.weights as Record<string, number> | undefined}
                 />
               </div>
+              </>
+                );
+              })()}
             </section>
           )}
 

@@ -6,10 +6,14 @@ from typing import Any, Dict, List
 from checkmate.schemas import AnalysisResult, RiskItem, EvidenceItem
 
 def render_output(result: AnalysisResult) -> Dict[str, Any]:
+    # Always send a website_type (backend may be old and not set it; fall back to debug or default)
+    website_type = result.website_type or result.debug.get("website_type") or "news_historical"
+    if website_type not in ("functional", "statistical", "news_historical", "company"):
+        website_type = "news_historical"
     output: Dict[str, Any] = {
         "status": result.status,
         "overall_score": result.overall_score,
-        "website_type": result.website_type,
+        "website_type": website_type,
         "subscores": result.subscores.model_dump() if result.subscores else None,
         "risks": [
             {
